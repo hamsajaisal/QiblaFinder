@@ -268,7 +268,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (System.currentTimeMillis() - lastCheck < oneDayMillis) return
 
         CoroutineScope(Dispatchers.Main).launch {
-            val updateInfo = UpdateChecker.checkForUpdate()
+            val updateInfo = UpdateChecker.checkForUpdate(this@MainActivity)
             if (updateInfo != null && updateInfo.isUpdateAvailable) {
                 updateVersion.value = updateInfo.latestVersion
                 updateUrl.value = updateInfo.downloadUrl

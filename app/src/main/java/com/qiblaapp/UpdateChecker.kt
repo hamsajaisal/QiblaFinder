@@ -1,5 +1,6 @@
 package com.qiblaapp
 
+import android.content.pm.PackageManager
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -22,7 +23,6 @@ object UpdateChecker {
 
     private const val GITHUB_API_URL =
         "https://api.github.com/repos/hamsajaisal/QiblaFinder/releases/latest"
-    private const val CURRENT_VERSION = "2.5"
 
     data class UpdateInfo(
         val latestVersion: String,
@@ -33,7 +33,20 @@ object UpdateChecker {
 
     // Check GitHub for latest version
     // Returns null if no internet or no update available
-    suspend fun checkForUpdate(): UpdateInfo? {
+    suspend fun checkForUpdate(context: Context): UpdateInfo? {
+        val currentVersion = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(
+                    context.packageName,
+                    PackageManager.PackageInfoFlags.of(0)
+                ).versionName ?: "0.0"
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0"
+            }
+        } catch (e: Exception) {
+            "0.0"
+        }
         return withContext(Dispatchers.IO) {
             try {
                 val url = URL(GITHUB_API_URL)
@@ -68,7 +81,7 @@ object UpdateChecker {
 
                 if (downloadUrl.isEmpty()) return@withContext null
 
-                val isUpdateAvailable = isNewerVersion(latestVersion, CURRENT_VERSION)
+                val isUpdateAvailable = isNewerVersion(latestVersion, currentVersion)
 
                 UpdateInfo(
                     latestVersion = latestVersion,
