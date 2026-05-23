@@ -22,7 +22,7 @@ object UpdateChecker {
 
     private const val GITHUB_API_URL =
         "https://api.github.com/repos/hamsajaisal/QiblaFinder/releases/latest"
-    private const val CURRENT_VERSION = "2.1"
+    private const val CURRENT_VERSION = "2.5"
 
     data class UpdateInfo(
         val latestVersion: String,
