@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.rotate
+import android.widget.Toast
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
@@ -58,8 +59,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private val alpha = 0.15f
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private var userLat = 0.0
-    private var userLon = 0.0
+    private var userLatState = mutableStateOf(0.0)
+    private var userLonState = mutableStateOf(0.0)
+
+    private var userLat: Double
+        get() = userLatState.value
+        set(value) { userLatState.value = value }
+
+    private var userLon: Double
+        get() = userLonState.value
+        set(value) { userLonState.value = value }
     private var locationFound = false
 
     private val KAABA_LAT = 21.4225
@@ -98,6 +107,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var updateUrl = mutableStateOf("")
     private var updateNotes = mutableStateOf("")
     private var isDownloading = mutableStateOf(false)
+    private var showUpToDateDialog = mutableStateOf(false)
+    private var showUpdateErrorDialog = mutableStateOf(false)
 
     private val exactAlarmLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -145,7 +156,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 else -> androidx.compose.foundation.isSystemInDarkTheme()
             }
             com.qiblaapp.ui.theme.QiblaAppTheme(darkTheme = isDarkTheme) {
-                // Update dialog
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // Update dialog
                 if (showUpdateDialog.value) {
                     UpdateDialog(
                         version = updateVersion.value,
@@ -163,6 +178,32 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         },
                         onCancel = {
                             showUpdateDialog.value = false
+                        }
+                    )
+                }
+
+                if (showUpToDateDialog.value) {
+                    AlertDialog(
+                        onDismissRequest = { showUpToDateDialog.value = false },
+                        title = { Text("No Update Available", modifier = Modifier.semantics { heading() }) },
+                        text = { Text("Your application is up to date.") },
+                        confirmButton = {
+                            Button(onClick = { showUpToDateDialog.value = false }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
+
+                if (showUpdateErrorDialog.value) {
+                    AlertDialog(
+                        onDismissRequest = { showUpdateErrorDialog.value = false },
+                        title = { Text("Connection Error", modifier = Modifier.semantics { heading() }) },
+                        text = { Text("Could not check for updates. Please check your internet connection and try again.") },
+                        confirmButton = {
+                            Button(onClick = { showUpdateErrorDialog.value = false }) {
+                                Text("OK")
+                            }
                         }
                     )
                 }
@@ -252,10 +293,29 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             selectedTheme.value = theme
                             prefs.edit().putString("theme", theme).apply()
                         },
+                        onCheckForUpdates = {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                Toast.makeText(this@MainActivity, "Checking for updates...", Toast.LENGTH_SHORT).show()
+                                val info = UpdateChecker.checkForUpdate(this@MainActivity)
+                                if (info != null) {
+                                    if (info.isUpdateAvailable) {
+                                        updateVersion.value = info.latestVersion
+                                        updateNotes.value = info.releaseNotes
+                                        updateUrl.value = info.downloadUrl
+                                        showUpdateDialog.value = true
+                                    } else {
+                                        showUpToDateDialog.value = true
+                                    }
+                                } else {
+                                    showUpdateErrorDialog.value = true
+                                }
+                            }
+                        },
                         onNavigateBack = {
                             currentScreen.value = "qibla"
                         }
                     )
+                }
                 }
             }
         }
@@ -835,6 +895,7 @@ fun SettingsScreen(
     onAsrHanafiToggle: (Boolean) -> Unit,
     onManualAdjustmentChange: (Int) -> Unit,
     onThemeChange: (String) -> Unit,
+    onCheckForUpdates: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val formatAdjustment = { adj: Int ->
@@ -1036,6 +1097,21 @@ fun SettingsScreen(
         )
 
         Divider()
+
+        Button(
+            onClick = onCheckForUpdates,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .semantics {
+                    contentDescription =
+                        "Check for Updates. Double tap to check."
+                }
+        ) {
+            Text("Check for Updates", fontSize = 18.sp)
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         val context = LocalContext.current
 
